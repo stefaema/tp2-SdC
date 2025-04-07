@@ -9,22 +9,22 @@
     *   [ ] Cada miembro (excepto el dueño) debe hacer un fork del repositorio principal.
     *   [ ] Establecer flujo de trabajo: desarrollo en forks -> Pull Requests -> revisión -> merge en el principal. Commit por cada funcionalidad/mejora significativa con mensaje descriptivo.
 *   [ ] **Instalar Software Requerido (Linux - ej. Ubuntu 22.04):**
-    *   [ ] `sudo apt update && sudo apt upgrade -y`
-    *   [ ] `sudo apt install build-essential nasm gcc-multilib g++-multilib gdb python3 python3-pip git -y`
-    *   [ ] `pip install requests` (para Python)
-    *   [ ] (Opcional, si se usa C para API) `sudo apt install libcurl4-openssl-dev`
-    *   [ ] (Opcional, si hay problemas 32/64 bits con Python) Investigar/instalar `msl-loadlib` o verificar compatibilidad de `ctypes`.
-*   [ ] **Verificar Entorno:** Compilar y ejecutar programas de ejemplo C y NASM (ej., del libro de Paul Carter) para asegurar que el toolchain funciona (incluyendo enlace 32-bit: `gcc -m32 ...`, `nasm -f elf32 ...`).
+    *   [x] `sudo apt update && sudo apt upgrade -y`
+    *   [x] `sudo apt install build-essential nasm gcc-multilib g++-multilib gdb python3 python3-pip git -y`
+    *   [x] `pip install requests` (para Python)
+    *   - (Opcional, si se usa C para API) `sudo apt install libcurl4-openssl-dev`
+    *   - (Opcional, si hay problemas 32/64 bits con Python) Investigar/instalar `msl-loadlib` o verificar compatibilidad de `ctypes`.
+*   [x] **Verificar Entorno:** Compilar y ejecutar programas de ejemplo C y NASM (ej., del libro de Paul Carter) para asegurar que el toolchain funciona (incluyendo enlace 32-bit: `gcc -m32 ...`, `nasm -f elf32 ...`).
 *   [ ] **Lectura Obligatoria:** Leer Capítulos 1-4 del libro de Paul A. Carter ("Lenguaje Ensamblador para PC"). Compilar y depurar ejemplos del Cap. 4.
 
 **Fase 1: Iteración Inicial - Funcionalidad Base (Python + C)**
 
 *   [ ] **Capa Superior (Python): Consumo de API REST**
-    *   [ ] Crear script Python (`main.py` o similar).
-    *   [ ] Usar `requests` para llamar a la API del Banco Mundial: `https://api.worldbank.org/v2/en/country/all/indicator/SI.POV.GINI?format=json&date=2011:2020&per_page=32500&page=1&country=%22Argentina%22` (o país elegido).
-    *   [ ] Implementar manejo de errores básicos (conexión, respuesta no exitosa).
-    *   [ ] Parsear la respuesta JSON.
-    *   [ ] Extraer el valor más reciente del índice GINI (float) para el país seleccionado. Manejar casos donde el dato no exista o sea `null`.
+    *   [x] Crear script Python (`main.py` o similar).
+    *   [x] Usar `requests` para llamar a la API del Banco Mundial: `https://api.worldbank.org/v2/en/country/all/indicator/SI.POV.GINI?format=json&date=2011:2020&per_page=32500&page=1&country=%22Argentina%22` (o país elegido).
+    *   [x] Implementar manejo de errores básicos (conexión, respuesta no exitosa).
+    *   [x] Parsear la respuesta JSON.
+    *   [x] Extraer el valor más reciente del índice GINI (float) para el país seleccionado. Manejar casos donde el dato no exista o sea `null`.
 *   [ ] **Capa Intermedia (C): Procesamiento Simulado**
     *   [ ] Crear archivo C (`process.c` o similar).
     *   [ ] Definir una función C, ej: `int process_gini_c_version(float gini_float)`.
