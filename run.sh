@@ -26,7 +26,7 @@ fi
 echo
 
 # --- 2. Verificar Existencia de la Biblioteca Compilada ---
-LIB_PATH="src/lib/libginiprocessor.so"
+LIB_PATH="lib/libginiprocessor.so"
 bold "Paso 2: Verificando biblioteca C/ASM compilada..."
 if [ ! -f "$LIB_PATH" ]; then
     red "Error: Biblioteca C/ASM '${LIB_PATH}' no encontrada."

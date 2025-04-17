@@ -1,6 +1,6 @@
 # Python virtual environment
 venv/
-tp2_venv/ # Nombre antiguo, por si acaso
+
 
 # Python cache files
 __pycache__/

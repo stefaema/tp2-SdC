@@ -73,6 +73,7 @@ class GiniProcessorServer(Server32):
             print(f"{ERROR_PREFIX}Error inesperado durante la inicialización: {type(e).__name__}: {e}", file=sys.stderr)
             raise
 
+
     # --- Método expuesto al Client64 ---
     # El nombre de este método Python debe coincidir con el que llama el Client64
     def process_gini_float(self, gini_value_float):

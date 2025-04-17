@@ -15,7 +15,7 @@ green "--- Iniciando Compilación C/ASM (32-bit) ---"
 # --- Definición de Archivos y Directorios ---
 SRC_DIR="src"
 C_BRIDGE_DIR="${SRC_DIR}/c_bridge"
-LIB_DIR="${SRC_DIR}/lib"
+LIB_DIR="../${SRC_DIR}/lib"
 
 ASM_SOURCE="${C_BRIDGE_DIR}/float_rounder.asm"
 ASM_OBJECT="${C_BRIDGE_DIR}/float_rounder.o" # Objeto intermedio

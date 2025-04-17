@@ -49,7 +49,7 @@ echo
 bold "Paso 3: Activando entorno virtual e instalando requisitos de 'requirements.txt'..."
 # Activa el entorno virtual
 source "${VENV_DIR}/bin/activate" || { red "Error activando el entorno virtual."; exit 1; }
-green "Entorno virtual activado. (Python: $(which python))"
+green "Entorno virtual activado."
 
 # Actualiza pip e instala requerimientos
 echo "Comando: pip install --upgrade pip"

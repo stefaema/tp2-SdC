@@ -303,15 +303,3 @@ class GiniApp:
             # Rehabilita el botón si aún hay un valor válido para procesar
             if self.latest_gini_value_for_processing is not None:
                  self.process_button.config(state=tk.NORMAL)
-
-# --- Punto de Entrada Principal ---
-if __name__ == "__main__":
-    # Este bloque solo se ejecuta si se corre gui.py directamente (para pruebas rápidas)
-    # El punto de entrada real de la aplicación es main.py
-    print("Ejecutando gui.py directamente (solo para pruebas de UI)...")
-    try:
-        root = tk.Tk()
-        app = GiniApp(root)
-        root.mainloop()
-    except Exception as e:
-        print(f"Error al iniciar la GUI directamente: {e}", file=sys.stderr)
