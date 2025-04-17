@@ -1,13 +1,22 @@
 # logic.py
 # Contains core data fetching and processing logic, NO GUI code.
-# Includes CLI entry point and C library integration.
+# Includes CLI entry point and C library integration (using msl-loadlib Client64).
 
 import requests
 import sys
 import argparse
-import ctypes # Import ctypes
-import os      # Import os for path manipulation
+import ctypes # Still needed for type definitions if not using __getattr__
+import os
 from typing import Optional, List, Dict, Any
+
+# --- Import Client64 ---
+try:
+    from msl.loadlib import Client64
+    # Import Server32Error to catch specific errors from the server
+    from msl.loadlib.exceptions import Server32Error
+except ImportError:
+    print("ERROR: 'msl-loadlib' is not installed. Please run setup script or 'pip install msl-loadlib'", file=sys.stderr)
+    sys.exit(1)
 
 # --- Constants ---
 BASE_URL = "https://api.worldbank.org/v2/en/country"
@@ -15,57 +24,119 @@ INDICATOR = "SI.POV.GINI"
 DATE_RANGE = "2011:2020"
 PER_PAGE = "100"
 
-# --- C Library Setup ---
-LIB_NAME = 'libginiadder.so'
-C_FUNC_NAME = 'process_gini_pure_c'
-_c_library = None
-_c_process_func = None
+# --- C Library Integration using Client64 ---
 
-def _load_c_library():
-    """Loads the C library and sets up the function signature."""
-    global _c_library, _c_process_func
-    if _c_process_func: # Already loaded
-        return True
+# Name of the Python module file containing the Server32 class
+SERVER_MODULE = 'server_32' # No .py extension needed
+
+# Global client instance (lazy loaded)
+_gini_client = None
+
+class GiniAdderClient(Client64):
+    """
+    Client to communicate with the GiniAdderServer running in a 32-bit process.
+    """
+    def __init__(self):
+        print(f"[Client64] Initializing GiniAdderClient...", file=sys.stderr)
+        try:
+            # Initialize Client64, specifying the 32-bit server module.
+            # msl-loadlib will find SERVER_MODULE.py and run it in a 32-bit Python process.
+            super().__init__(module32=SERVER_MODULE)
+            print(f"[Client64] Successfully initialized Client64 for module '{SERVER_MODULE}'.", file=sys.stderr)
+        except Exception as e:
+            # Catch errors during Client64 initialization (e.g., cannot start server process)
+            print(f"[Client64] FATAL ERROR during Client64 init: {type(e).__name__}: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            raise # Re-raise to prevent use of uninitialized client
+
+    # --- Option 1: Define explicit methods (Good for clarity, IDE help) ---
+    # def process_gini_pure_c(self, gini_value: float) -> int:
+    #     """
+    #     Sends a request to the 'process_gini_pure_c' method on the Server32.
+    #     """
+    #     print(f"[Client64] Sending request: 'process_gini_pure_c' with value {gini_value}", file=sys.stderr)
+    #     # The first argument to request32 is the METHOD NAME on the Server32 class.
+    #     # Subsequent arguments are passed to that method.
+    #     return self.request32('process_gini_pure_c', gini_value)
+
+    # --- Option 2: Use __getattr__ (Simpler if many functions just pass through) ---
+    def __getattr__(self, name):
+        """
+        Dynamically creates methods that call request32 with the method name.
+        This avoids writing a wrapper method for every function on the server.
+        """
+        # Check if the requested name is likely a method we want to proxy
+        # Avoid proxying special methods like __deepcopy__, __getstate__ etc.
+        if name.startswith('_'):
+             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+        print(f"[Client64] __getattr__ creating proxy for '{name}'", file=sys.stderr)
+        def send_request(*args, **kwargs):
+            print(f"[Client64] Sending request via proxy: '{name}'", file=sys.stderr)
+            # 'name' will be 'process_gini_pure_c' when called
+            return self.request32(name, *args, **kwargs)
+        return send_request
+    # --- End Option 2 ---
+
+
+def _get_client_instance() -> Optional[GiniAdderClient]:
+    """Gets or creates the singleton GiniAdderClient instance."""
+    global _gini_client
+    if _gini_client is None:
+        print("[Logic] Creating GiniAdderClient instance...", file=sys.stderr)
+        try:
+            _gini_client = GiniAdderClient()
+        except Exception as e:
+            # Handle client creation failure
+             print(f"[Logic] Failed to create GiniAdderClient: {type(e).__name__}: {e}", file=sys.stderr)
+             _gini_client = None # Ensure it's None if creation fails
+    return _gini_client
+
+
+# --- C Function Call (process_data_with_c) ---
+# This function now uses the client instance to make the request
+def process_data_with_c(gini_value: float) -> Optional[int]:
+    """
+    Uses the GiniAdderClient (Client64) to request the C processing
+    from the 32-bit server.
+
+    Args:
+        gini_value: The float GINI value to process.
+
+    Returns:
+        The integer result from the C function via the server, or None if an error occurs.
+    """
+    client = _get_client_instance()
+    if client is None:
+        print("[Logic] Cannot process with C: Client instance is not available.", file=sys.stderr)
+        return None
 
     try:
-        # Construct path relative to this file's location
-        lib_path = os.path.join(os.path.dirname(__file__), LIB_NAME)
-        print(f"[Logic] Attempting to load C library from: {lib_path}", file=sys.stderr)
-        _c_library = ctypes.CDLL(lib_path)
+        # Call the method on the client instance.
+        # If using explicit methods (Option 1):
+        # result = client.process_gini_pure_c(gini_value)
 
-        # Get the function pointer
-        _c_process_func = getattr(_c_library, C_FUNC_NAME) # Use getattr for safer access
+        # If using __getattr__ (Option 2):
+        # This looks like a direct method call, but __getattr__ intercepts it
+        # and calls client.request32('process_gini_pure_c', gini_value)
+        result = client.process_gini_pure_c(gini_value)
 
-        # --- Define function signature (CRUCIAL) ---
-        # Corresponds to: int process_gini_pure_c(float gini_value)
-        _c_process_func.argtypes = [ctypes.c_float] # Expects a C float
-        _c_process_func.restype = ctypes.c_int      # Returns a C int
-        # -------------------------------------------
-
-        print(f"[Logic] Successfully loaded C function '{C_FUNC_NAME}'", file=sys.stderr)
-        return True
-
-    except OSError as e:
-        print(f"[Logic] Error loading C library '{LIB_NAME}': {e}", file=sys.stderr)
-        print(f"[Logic] Ensure '{LIB_NAME}' is compiled correctly (esp. -m32) and exists at the expected path.", file=sys.stderr)
-        _c_library = None
-        _c_process_func = None
-        return False
-    except AttributeError as e:
-         print(f"[Logic] Error finding C function '{C_FUNC_NAME}' in library '{LIB_NAME}': {e}", file=sys.stderr)
-         _c_library = None
-         _c_process_func = None
-         return False
-    except Exception as e: # Catch any other loading errors
-        print(f"[Logic] Unexpected error loading C library or function: {e}", file=sys.stderr)
-        _c_library = None
-        _c_process_func = None
-        return False
+        print(f"[Logic] Received result from 32-bit server: {result}", file=sys.stderr)
+        return result
+    except Server32Error as e:
+        # Catch errors specifically raised by the 32-bit server process
+        print(f"[Logic] Error received from 32-bit server: {e}", file=sys.stderr)
+        return None
+    except Exception as e:
+        # Catch other potential errors during the request (e.g., connection issues)
+        print(f"[Logic] Error during request to 32-bit server: {type(e).__name__}: {e}", file=sys.stderr)
+        return None
 
 
-# --- Data Fetching (Keep the robust get_gini_data function from previous step) ---
+# --- Data Fetching (get_gini_data - NO CHANGES NEEDED) ---
 def get_gini_data(country_code: str) -> tuple[Optional[List[Dict[str, Any]]], Optional[str]]:
-    # ... (robust get_gini_data function as before) ...
+    # ... (Keep the existing robust get_gini_data function) ...
     url = f"{BASE_URL}/{country_code}/indicator/{INDICATOR}"
     params = {
         "format": "json",
@@ -119,9 +190,9 @@ def get_gini_data(country_code: str) -> tuple[Optional[List[Dict[str, Any]]], Op
         import traceback; traceback.print_exc(file=sys.stderr); error_message = f"An unexpected error occurred:\n{type(e).__name__}"; return None, error_message
 
 
-# --- Data Processing (Keep find_latest_valid_gini function from previous step) ---
+# --- Data Processing (find_latest_valid_gini - NO CHANGES NEEDED) ---
 def find_latest_valid_gini(records: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    # ... (find_latest_valid_gini function as before) ...
+    # ... (Keep the existing find_latest_valid_gini function) ...
     latest_valid_record = None; latest_year = -1
     if not records: return None
     for record in records:
@@ -138,38 +209,9 @@ def find_latest_valid_gini(records: List[Dict[str, Any]]) -> Optional[Dict[str, 
     return latest_valid_record
 
 
-# --- C Function Call ---
-def process_data_with_c(gini_value: float) -> Optional[int]:
-    """
-    Calls the C function 'process_gini_pure_c' from the shared library.
-
-    Args:
-        gini_value: The float GINI value to process.
-
-    Returns:
-        The integer result from the C function, or None if the library
-        cannot be loaded or the function call fails.
-    """
-    if not _load_c_library(): # Try to load if not already loaded
-        return None # Loading failed
-
-    if _c_process_func is None: # Check again after loading attempt
-         print("[Logic] Error: C function reference is not available.", file=sys.stderr)
-         return None
-
-    try:
-        # Call the C function, passing the Python float wrapped as c_float
-        result = _c_process_func(ctypes.c_float(gini_value))
-        print(f"[Logic] C function '{C_FUNC_NAME}' called with {gini_value}, returned {result}", file=sys.stderr)
-        return result
-    except Exception as e:
-        # Catch potential errors during the actual function call
-        print(f"[Logic] Error calling C function '{C_FUNC_NAME}': {e}", file=sys.stderr)
-        return None
-
-# --- CLI Entry Point (Keep the argparse section from previous step) ---
+# --- CLI Entry Point (__main__ - NO CHANGES NEEDED) ---
 if __name__ == "__main__":
-    # ... (argparse CLI code as before) ...
+    # ... (Keep the existing argparse CLI code) ...
     parser = argparse.ArgumentParser(description=f"Fetch GINI index data ({DATE_RANGE}) from the World Bank API.")
     parser.add_argument("country_code", help="The 3-letter ISO country code (e.g., ARG, USA, BRA).")
     parser.add_argument("-H", "--history", action="store_true", help="Show historical data in addition to the latest value.")
@@ -196,10 +238,11 @@ if __name__ == "__main__":
     try:
         latest_gini_float = float(latest_record['value']); print(f"Latest GINI:  {latest_gini_float:.2f}")
         if args.process_c:
-             print("\n--- C Processing ---"); c_result = process_data_with_c(latest_gini_float)
+             print("\n--- C Processing (via Client64/Server32) ---");
+             c_result = process_data_with_c(latest_gini_float) # Calls the modified function
              if c_result is not None: print(f"Input to C:   {latest_gini_float:.2f}"); print(f"Output: {c_result}")
-             else: print("Error during C processing.", file=sys.stderr)
-    except (ValueError, TypeError): 
+             else: print("Error during C processing (check logs).", file=sys.stderr)
+    except (ValueError, TypeError):
         print(f"Latest GINI:  {latest_record['value']} (Error: Not a valid number)", file=sys.stderr)
 
         if args.process_c: print("\nCannot perform C processing: Latest GINI value is not a valid number.", file=sys.stderr)

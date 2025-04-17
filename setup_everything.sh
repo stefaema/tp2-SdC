@@ -25,11 +25,16 @@ bold() {
 set -e
 
 green "📦 Setting up the environment..."
-bold "> sudo apt instrall python3-tk -y"
+bold "> sudo apt install python3-tk -y"
 sudo apt install python3-tk -y
 bold "> python -m venv tp2_venv"
 python -m venv tp2_venv
 
+bold "> sudo apt-get install gcc-multilib -y"
+sudo apt-get install gcc-multilib -y
+
+bold "> sudo apt install g++ gfortran libgfortran5 zlib1g:i386 libstdc++6:i386 libgfortran5:i386 -y (For msl-lib)"
+sudo apt install g++ gfortran libgfortran5 zlib1g:i386 libstdc++6:i386 libgfortran5:i386 -y
 
 bold "> source tp2_venv/bin/activate"
 source tp2_venv/bin/activate
